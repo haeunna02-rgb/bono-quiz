@@ -1,0 +1,1259 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>본오중학교 1학년 정보 서바이벌 슈팅 퀴즈</title>
+  <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #111;
+      font-family: 'Noto Sans KR', sans-serif;
+      color: #fff;
+    }
+
+    #gameCanvas {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+
+    /* 배틀그라운드 HUD 오버레이 */
+    #hud {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      display: none;
+    }
+
+    /* 상단 나침반 및 상태 바 */
+    .top-bar {
+      position: absolute;
+      top: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+    }
+    .compass {
+      background: rgba(0, 0, 0, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 4px 20px;
+      border-radius: 4px;
+      font-size: 13px;
+      letter-spacing: 2px;
+      color: #e0e0e0;
+    }
+    .school-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #f1c40f;
+      text-shadow: 0 1px 4px #000;
+      background: rgba(0,0,0,0.6);
+      padding: 3px 12px;
+      border-radius: 12px;
+    }
+
+    /* 우상단 킬 카운트 및 생존 */
+    .hud-right-top {
+      position: absolute;
+      top: 20px;
+      right: 25px;
+      text-align: right;
+    }
+    .alive-badge {
+      font-family: 'Black Han Sans', sans-serif;
+      font-size: 26px;
+      color: #fff;
+      text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+    }
+    .alive-badge span {
+      color: #ff9800;
+      font-size: 32px;
+    }
+    .score-badge {
+      font-size: 16px;
+      color: #4cd137;
+      font-weight: bold;
+      text-shadow: 0 1px 3px #000;
+    }
+
+    /* 좌상단 학생 정보 */
+    .student-badge {
+      position: absolute;
+      top: 20px;
+      left: 25px;
+      background: rgba(18, 18, 18, 0.75);
+      border-left: 4px solid #f39c12;
+      padding: 10px 18px;
+      border-radius: 4px;
+    }
+    .student-badge div:first-child {
+      font-size: 12px;
+      color: #aaa;
+    }
+    .student-badge div:last-child {
+      font-size: 18px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    /* 조준 크로스헤어 */
+    .crosshair {
+      position: absolute;
+      top: 48%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 24px;
+      height: 24px;
+      pointer-events: none;
+    }
+    .crosshair::before, .crosshair::after {
+      content: '';
+      position: absolute;
+      background: rgba(255, 255, 255, 0.85);
+      box-shadow: 0 0 3px #000;
+    }
+    .crosshair::before {
+      top: 11px;
+      left: 0;
+      width: 24px;
+      height: 2px;
+    }
+    .crosshair::after {
+      left: 11px;
+      top: 0;
+      width: 2px;
+      height: 24px;
+    }
+    .crosshair .dot {
+      position: absolute;
+      top: 9px;
+      left: 9px;
+      width: 6px;
+      height: 6px;
+      background: #e74c3c;
+      border-radius: 50%;
+    }
+
+    /* 하단 체력 바 및 탄약 */
+    .bottom-hud {
+      position: absolute;
+      bottom: 25px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      width: 380px;
+    }
+    .hp-container {
+      width: 100%;
+      height: 12px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+    }
+    .hp-bar {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #e74c3c, #2ecc71);
+      transition: width 0.2s ease;
+    }
+    .controls-hint {
+      font-size: 13px;
+      color: #bbb;
+      background: rgba(0,0,0,0.5);
+      padding: 4px 14px;
+      border-radius: 12px;
+    }
+
+    /* 공통 모달 및 팝업 화면 */
+    .screen-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(10, 12, 16, 0.88);
+      backdrop-filter: blur(8px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+    }
+    .card {
+      background: #1b1e23;
+      border: 1px solid #333a42;
+      border-top: 4px solid #f39c12;
+      border-radius: 8px;
+      padding: 35px 40px;
+      width: 90%;
+      max-width: 580px;
+      box-shadow: 0 15px 40px rgba(0,0,0,0.8);
+      text-align: center;
+    }
+    .card h1 {
+      font-family: 'Black Han Sans', sans-serif;
+      font-size: 32px;
+      margin-bottom: 8px;
+      color: #f1c40f;
+      letter-spacing: 1px;
+    }
+    .card p.sub {
+      color: #9aa0a6;
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+      text-align: left;
+    }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      color: #ccc;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    .input-field {
+      width: 100%;
+      padding: 12px 14px;
+      background: #101216;
+      border: 1px solid #444c56;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .input-field:focus {
+      border-color: #f39c12;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 14px;
+      background: #f39c12;
+      color: #111;
+      font-weight: 800;
+      font-size: 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn:hover {
+      background: #e67e22;
+    }
+    .btn:active {
+      transform: scale(0.98);
+    }
+    .btn-secondary {
+      background: #2d333b;
+      color: #e0e0e0;
+      margin-top: 10px;
+    }
+    .btn-secondary:hover {
+      background: #3b434e;
+    }
+
+    /* 퀴즈 모달창 (PUBG 에어드랍 스타일) */
+    #quizModal {
+      display: none;
+      z-index: 200;
+    }
+    .quiz-card {
+      background: #1e232a;
+      border: 2px solid #e74c3c;
+      box-shadow: 0 0 35px rgba(231, 76, 60, 0.4);
+      max-width: 650px;
+      text-align: left;
+    }
+    .quiz-badge {
+      display: inline-block;
+      background: #e74c3c;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 3px;
+      margin-bottom: 12px;
+      letter-spacing: 1px;
+    }
+    .quiz-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 15px;
+      line-height: 1.4;
+      color: #fff;
+    }
+
+    /* 엔트리 블록 시각화 카드 */
+    .block-view {
+      background: #14181d;
+      border: 1px solid #2d333b;
+      border-radius: 6px;
+      padding: 16px;
+      margin-bottom: 20px;
+      font-family: monospace;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .entry-start { background: #2ecc71; color: #fff; padding: 3px 8px; border-radius: 4px; display: inline-block; font-weight: bold; margin-bottom: 6px;}
+    .entry-var { background: #9b59b6; color: #fff; padding: 2px 7px; border-radius: 4px; }
+    .entry-if { background: #3498db; color: #fff; padding: 2px 7px; border-radius: 4px; }
+    .entry-repeat { background: #487eb0; color: #fff; padding: 2px 7px; border-radius: 4px; }
+    .entry-say { background: #e84118; color: #fff; padding: 2px 7px; border-radius: 4px; }
+
+    .options-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    .option-btn {
+      background: #282e38;
+      border: 1px solid #3c4452;
+      color: #e6edf3;
+      padding: 14px 18px;
+      font-size: 15px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s;
+    }
+    .option-btn:hover {
+      background: #384252;
+      border-color: #f39c12;
+      transform: translateX(4px);
+    }
+
+    /* 선생님 모드 관리 창 */
+    #adminModal {
+      display: none;
+      z-index: 300;
+    }
+    .admin-card {
+      max-width: 780px;
+      max-height: 85vh;
+      overflow-y: auto;
+      text-align: left;
+    }
+    .q-item {
+      background: #14171c;
+      padding: 12px 16px;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      border-left: 3px solid #3498db;
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .delete-btn {
+      background: #e74c3c;
+      border: none;
+      color: #fff;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    /* 피격 붉은 이펙트 */
+    #damageFlash {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      box-shadow: inset 0 0 100px rgba(231, 76, 60, 0.7);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.1s ease-out;
+    }
+
+    /* 명예의 전당 테이블 */
+    .rank-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 15px 0 25px;
+      font-size: 14px;
+    }
+    .rank-table th, .rank-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid #333a42;
+      text-align: center;
+    }
+    .rank-table th {
+      background: #121418;
+      color: #f39c12;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 3D 전장 캔버스 -->
+  <canvas id="gameCanvas"></canvas>
+  <div id="damageFlash"></div>
+
+  <!-- 인게임 HUD -->
+  <div id="hud">
+    <div class="top-bar">
+      <div class="compass">N · · 15 · · 30 · · NE · · 60 · · 75 · · E</div>
+      <div class="school-title">🏫 본오중학교 1학년 정보 서바이벌</div>
+    </div>
+
+    <div class="student-badge">
+      <div>OPERATOR (본오중 1학년)</div>
+      <div id="hudStudentDisplay">10101 홍길동</div>
+    </div>
+
+    <div class="hud-right-top">
+      <div class="alive-badge">ELIMINATED <span id="killCount">0</span></div>
+      <div class="score-badge">SCORE: <span id="scoreCount">0</span> PTS</div>
+      <div style="font-size:12px; color:#bbb; margin-top:4px;">다음 퀴즈 보급까지: <span id="nextQuizRemaining">3</span>마리</div>
+    </div>
+
+    <div class="crosshair">
+      <div class="dot"></div>
+    </div>
+
+    <div class="bottom-hud">
+      <div class="hp-container">
+        <div class="hp-bar" id="hpBar"></div>
+      </div>
+      <div class="controls-hint">
+        [A][D] 또는 [좌우 방향키] 좌우 이동 | 🎯 마우스 클릭: 사격 | 적이 다가오기 전에 격추하세요!
+      </div>
+    </div>
+  </div>
+
+  <!-- 1. 시작 화면 (로그인) -->
+  <div id="startScreen" class="screen-overlay">
+    <div class="card">
+      <div style="font-size: 40px; margin-bottom: 10px;">🎯</div>
+      <h1>BON-OH INFO BATTLE</h1>
+      <p class="sub">본오중학교 1학년 정보 교육용 실시간 슈팅 퀴즈</p>
+      
+      <div class="form-group">
+        <label>학번 (예: 10523)</label>
+        <input type="text" id="inputStudentId" class="input-field" placeholder="학번 5자리를 입력하세요" maxlength="5">
+      </div>
+      <div class="form-group">
+        <label>이름</label>
+        <input type="text" id="inputStudentName" class="input-field" placeholder="이름을 입력하세요">
+      </div>
+
+      <button class="btn" onclick="startGame()">작전 투입 (게임 시작)</button>
+      <button class="btn btn-secondary" onclick="openTeacherAuth()">선생님 모드 (문제 관리)</button>
+    </div>
+  </div>
+
+  <!-- 2. 에어드랍 퀴즈 팝업 -->
+  <div id="quizModal" class="screen-overlay">
+    <div class="card quiz-card">
+      <span class="quiz-badge">🚨 TACTICAL QUIZ AIRDROP</span>
+      <div class="quiz-title" id="quizQuestionText">문제 내용이 여기에 표시됩니다.</div>
+      
+      <div id="blockSnippetContainer" class="block-view" style="display:none;"></div>
+
+      <div class="options-grid" id="quizOptionsContainer">
+        <!-- 보기 버튼 동적 생성 -->
+      </div>
+      <div style="font-size:12px; color:#888; text-align:right;">정답을 맞히면 300점 획득 및 체력이 회복됩니다!</div>
+    </div>
+  </div>
+
+  <!-- 3. 게임 오버 / 랭킹 화면 -->
+  <div id="gameOverModal" class="screen-overlay" style="display:none;">
+    <div class="card">
+      <h1 style="color: #e74c3c;">MISSION TERMINATED</h1>
+      <p class="sub" id="gameOverSummary">수고하셨습니다!</p>
+      
+      <table class="rank-table">
+        <thead>
+          <tr>
+            <th>순위</th>
+            <th>학번</th>
+            <th>이름</th>
+            <th>격추 수</th>
+            <th>최종 점수</th>
+          </tr>
+        </thead>
+        <tbody id="rankTableBody">
+          <!-- 랭킹 목록 -->
+        </tbody>
+      </table>
+
+      <button class="btn" onclick="restartGame()">다시 도전하기</button>
+    </div>
+  </div>
+
+  <!-- 4. 선생님 관리 모드 (비밀번호: 8666) -->
+  <div id="adminModal" class="screen-overlay">
+    <div class="card admin-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <h2 style="color:#f1c40f;">🛠️ 선생님 모드 (문제 관리자)</h2>
+        <button onclick="closeAdminModal()" style="background:none; border:none; color:#bbb; font-size:24px; cursor:pointer;">&times;</button>
+      </div>
+      <p style="color:#aaa; font-size:13px; margin-bottom:15px;">본오중 1학년 정보 퀴즈 데이터를 즉시 추가하거나 수정할 수 있습니다.</p>
+
+      <div style="background:#181c22; padding:15px; border-radius:6px; margin-bottom:20px;">
+        <h4 style="margin-bottom:10px; color:#4cd137;">➕ 새 문제 추가하기</h4>
+        <input type="text" id="newQText" class="input-field" placeholder="문제 지문 입력 (예: NOT 거짓의 결과는?)" style="margin-bottom:8px;">
+        <input type="text" id="newQOptions" class="input-field" placeholder="보기들 (쉼표로 구분: 참, 거짓, 모름)" style="margin-bottom:8px;">
+        <input type="number" id="newQAnswer" class="input-field" placeholder="정답 번호 (1부터 시작)" style="margin-bottom:8px;">
+        <button class="btn" style="padding:10px;" onclick="addNewQuestion()">문제 저장하기</button>
+      </div>
+
+      <h4 style="margin-bottom:10px;">📋 등록된 문제 목록 (<span id="qCountBadge">0</span>개)</h4>
+      <div id="adminQuestionsList" style="max-height: 250px; overflow-y:auto;"></div>
+    </div>
+  </div>
+
+  <script>
+    /* ==========================================================
+       1. 기본 퀴즈 데이터베이스 (PDF 수행평가 및 교과 개념 탑재)
+       ========================================================== */
+    const INITIAL_QUESTIONS = [
+      // PDF 및 사용자 지정 논리 연산 기초
+      {
+        q: "1. 하나라도 거짓이면 연산 결과가 거짓인 논리 연산자는?",
+        options: ["그리고 (AND)", "또는 (OR)", "아니다 (NOT)"],
+        ans: 1,
+        codeSnippet: null
+      },
+      {
+        q: "2. 하나라도 참이면 연산 결과가 참인 논리 연산자는?",
+        options: ["그리고 (AND)", "또는 (OR)", "아니다 (NOT)"],
+        ans: 2,
+        codeSnippet: null
+      },
+      {
+        q: "3. 'NOT 참'의 연산 결과는 무엇일까요?",
+        options: ["참", "거짓"],
+        ans: 2,
+        codeSnippet: null
+      },
+      {
+        q: "4. 'NOT 거짓'의 연산 결과는 무엇일까요?",
+        options: ["참", "거짓"],
+        ans: 1,
+        codeSnippet: null
+      },
+      {
+        q: "5. 다음 식의 최종 결과는? [ 참 그리고 참 그리고 참 ]",
+        options: ["참", "거짓"],
+        ans: 1,
+        codeSnippet: null
+      },
+      {
+        q: "6. 다음 식의 최종 결과는? [ 참 또는 참 또는 거짓 ]",
+        options: ["참", "거짓"],
+        ans: 1,
+        codeSnippet: null
+      },
+      {
+        q: "7. 다음 식의 최종 결과는? [ 거짓 또는 참 또는 거짓 ]",
+        options: ["참", "거짓"],
+        ans: 1,
+        codeSnippet: null
+      },
+      {
+        q: "8. 다음 식의 최종 결과는? [ 참 그리고 거짓 그리고 참 ]",
+        options: ["참", "거짓"],
+        ans: 2,
+        codeSnippet: null
+      },
+      // PDF 수행평가 1 & 2 변형 (엔트리 블록 코드)
+      {
+        q: "9. [엔트리 코드 분석] 아래 코드가 실행되었을 때 변수가 말하는 최종 값은?",
+        options: ["100", "50", "15", "0"],
+        ans: 2,
+        codeSnippet: `
+          <div class="entry-start">▶ 시작하기 버튼을 클릭했을 때</div><br>
+          <span class="entry-var">변수</span> 를 <span style="color:#f1c40f">5</span> 로 정하기<br>
+          <span class="entry-if">만일</span> ( <span class="entry-var">변수</span> < 4 ) <b>또는</b> ( <span class="entry-var">변수</span> > 8 ) 이라면<br>
+          &nbsp;&nbsp;└ <span class="entry-var">변수</span> 를 100 으로 정하기<br>
+          <span class="entry-if">아니면</span><br>
+          &nbsp;&nbsp;└ <span class="entry-var">변수</span> 를 50 으로 정하기<br>
+          <span class="entry-say">변수 값 말하기</span>
+        `
+      },
+      {
+        q: "10. [엔트리 코드 분석] 아래 코드가 실행되었을 때 최종 출력되는 점수는?",
+        options: ["70", "80", "90", "100"],
+        ans: 3,
+        codeSnippet: `
+          <div class="entry-start">▶ 시작하기 버튼을 클릭했을 때</div><br>
+          <span class="entry-var">점수</span> 를 <span style="color:#f1c40f">80</span> 으로 정하기<br>
+          <span class="entry-if">만일</span> ( <span class="entry-var">점수</span> == 70 이 아니다 ) 라면<br>
+          &nbsp;&nbsp;└ <span class="entry-var">점수</span> 에 10 만큼 더하기<br>
+          <span class="entry-if">아니면</span><br>
+          &nbsp;&nbsp;└ <span class="entry-var">점수</span> 에 5 만큼 더하기<br>
+          <span class="entry-say">점수 값 말하기</span>
+        `
+      },
+      {
+        q: "11. [중첩 조건문 변형] 아래 코드가 실행된 후 '숫자' 변수의 최종 값은?",
+        options: ["30", "35", "0", "25"],
+        ans: 1,
+        codeSnippet: `
+          <div class="entry-start">▶ 시작하기 버튼을 클릭했을 때</div><br>
+          <span class="entry-var">숫자</span> 를 <span style="color:#f1c40f">25</span> 로 정하기<br>
+          <span class="entry-if">만일</span> ( <span class="entry-var">숫자</span> > 20 ) 이라면<br>
+          &nbsp;&nbsp;└ <span class="entry-if">만일</span> ( <span class="entry-var">숫자</span> < 30 ) 이라면<br>
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└ <span class="entry-var">숫자</span> 에 5 만큼 더하기<br>
+          &nbsp;&nbsp;└ <span class="entry-if">아니면</span><br>
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└ <span class="entry-var">숫자</span> 에 10 만큼 더하기<br>
+          <span class="entry-say">숫자 값 말하기</span>
+        `
+      },
+      {
+        q: "12. [이중 반복문] 아래 반복 구조가 끝난 뒤 출력되는 값은?",
+        options: ["15", "25", "30", "10"],
+        ans: 3,
+        codeSnippet: `
+          <div class="entry-start">▶ 시작하기 버튼을 클릭했을 때</div><br>
+          <span class="entry-var">숫자</span> 를 <span style="color:#f1c40f">0</span> 으로 정하기<br>
+          <span class="entry-repeat">3 번 반복하기</span><br>
+          &nbsp;&nbsp;└ <span class="entry-repeat">2 번 반복하기</span><br>
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└ <span class="entry-var">숫자</span> 에 5 만큼 더하기<br>
+          <span class="entry-say">숫자 값 말하기</span>
+        `
+      }
+    ];
+
+    // LocalStorage에서 문제 로드 (교사용 저장 기능 연동)
+    let quizBank = JSON.parse(localStorage.getItem('bonoh_quiz_bank')) || INITIAL_QUESTIONS;
+
+    function saveQuizBank() {
+      localStorage.setItem('bonoh_quiz_bank', JSON.stringify(quizBank));
+    }
+
+    /* ==========================================================
+       2. 플레이어 및 게임 스테이트
+       ========================================================== */
+    let currentStudent = { id: '', name: '' };
+    let gameState = 'START'; // START, PLAYING, QUIZ, GAMEOVER
+    let score = 0;
+    let kills = 0;
+    let hp = 100;
+    const MAX_HP = 100;
+    const QUIZ_KILL_INTERVAL = 3; // 3마리 처치할 때마다 퀴즈 등장
+    let killsUntilNextQuiz = QUIZ_KILL_INTERVAL;
+
+    // 캔버스 설정
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // 3인칭 캐릭터 및 슈팅 매직
+    const player = {
+      x: 0, // 좌우 오프셋 (-300 ~ 300)
+      speed: 8,
+      recoil: 0,
+      width: 44,
+      height: 70
+    };
+
+    const keys = {};
+    window.addEventListener('keydown', e => keys[e.code] = true);
+    window.addEventListener('keyup', e => keys[e.code] = false);
+
+    // 타겟 및 적군 시스템
+    let enemies = [];
+    let bullets = [];
+    let particles = [];
+    let muzzleFlashes = [];
+
+    class Enemy {
+      constructor() {
+        this.x = (Math.random() - 0.5) * 700;
+        this.z = 900; // 깊이 거리 (플레이어에게 0으로 다가옴)
+        this.speed = 2.2 + Math.random() * 1.5;
+        this.hp = 1;
+        this.type = Math.random() > 0.4 ? 'target' : 'bot'; // 표적판 또는 드론형 적
+      }
+      update() {
+        this.z -= this.speed;
+      }
+    }
+
+    class Bullet {
+      constructor(startX, startY, targetX, targetY) {
+        this.x = startX;
+        this.y = startY;
+        this.targetX = targetX;
+        this.targetY = targetY;
+        this.progress = 0;
+      }
+      update() {
+        this.progress += 0.25;
+      }
+    }
+
+    /* ==========================================================
+       3. 3D 배틀그라운드 훈련장 렌더링 엔진 (Canvas)
+       ========================================================== */
+    function project3D(x, y, z) {
+      const fov = 380;
+      const scale = fov / (fov + z);
+      const projX = canvas.width / 2 + (x - player.x) * scale;
+      const projY = canvas.height * 0.48 + y * scale;
+      return { x: projX, y: projY, scale: scale };
+    }
+
+    function renderScene() {
+      // 1. 하늘 렌더링 (PUBG 미라마/에란겔 분위기)
+      const skyGradient = ctx.createLinearGradient(0, 0, 0, canvas.height * 0.5);
+      skyGradient.addColorStop(0, '#5c8db5');
+      skyGradient.addColorStop(0.7, '#8fbcdb');
+      skyGradient.addColorStop(1, '#d5e4ec');
+      ctx.fillStyle = skyGradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height * 0.5);
+
+      // 구름
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.beginPath();
+      ctx.arc(canvas.width * 0.25, canvas.height * 0.18, 70, 0, Math.PI * 2);
+      ctx.arc(canvas.width * 0.32, canvas.height * 0.17, 90, 0, Math.PI * 2);
+      ctx.arc(canvas.width * 0.78, canvas.height * 0.2, 80, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 2. 사막/훈련장 지형 그라데이션
+      const groundGradient = ctx.createLinearGradient(0, canvas.height * 0.48, 0, canvas.height);
+      groundGradient.addColorStop(0, '#bca279');
+      groundGradient.addColorStop(0.3, '#ab8e64');
+      groundGradient.addColorStop(1, '#826947');
+      ctx.fillStyle = groundGradient;
+      ctx.fillRect(0, canvas.height * 0.48, canvas.width, canvas.height * 0.52);
+
+      // 원경 군사 시설 콘크리트 벽 & 연습 타겟 지지대
+      const wallP1 = project3D(-650, -40, 800);
+      const wallP2 = project3D(650, -40, 800);
+      const wallFloor1 = project3D(-650, 90, 800);
+      const wallFloor2 = project3D(650, 90, 800);
+
+      ctx.fillStyle = '#7a766c';
+      ctx.beginPath();
+      ctx.moveTo(wallP1.x, wallP1.y);
+      ctx.lineTo(wallP2.x, wallP2.y);
+      ctx.lineTo(wallFloor2.x, wallFloor2.y);
+      ctx.lineTo(wallFloor1.x, wallFloor1.y);
+      ctx.closePath();
+      ctx.fill();
+
+      // 지형 격자 원근선 (거리감 극대화)
+      ctx.strokeStyle = 'rgba(145, 120, 85, 0.4)';
+      ctx.lineWidth = 1;
+      for (let i = -1200; i <= 1200; i += 150) {
+        const pFar = project3D(i, 90, 850);
+        const pNear = project3D(i, 90, 50);
+        ctx.beginPath();
+        ctx.moveTo(pFar.x, pFar.y);
+        ctx.lineTo(pNear.x, pNear.y);
+        ctx.stroke();
+      }
+
+      // 3. 다가오는 적 / 훈련 타겟 렌더링
+      enemies.sort((a, b) => b.z - a.z); // 거리순 정렬 (화가 알고리즘)
+
+      enemies.forEach(e => {
+        const p = project3D(e.x, 30, e.z);
+        const size = Math.max(14, 110 * p.scale);
+
+        if (e.type === 'target') {
+          // 사진속 PUBG 사격 표적지 (빨간색 동심원)
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          // 나무 지지대
+          ctx.fillStyle = '#4a3728';
+          ctx.fillRect(-size * 0.08, 0, size * 0.16, size * 1.3);
+          // 표적판
+          ctx.fillStyle = '#ffffff';
+          ctx.strokeStyle = '#c0392b';
+          ctx.lineWidth = size * 0.08;
+          ctx.fillRect(-size * 0.4, -size * 0.8, size * 0.8, size * 0.9);
+          ctx.strokeRect(-size * 0.4, -size * 0.8, size * 0.8, size * 0.9);
+
+          ctx.beginPath();
+          ctx.arc(0, -size * 0.35, size * 0.25, 0, Math.PI * 2);
+          ctx.fillStyle = '#c0392b';
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(0, -size * 0.35, size * 0.1, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff';
+          ctx.fill();
+          ctx.restore();
+        } else {
+          // 다가오는 적군 더미 (헬멧 & 방탄복)
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          // 머리 헬멧
+          ctx.fillStyle = '#2c3e50';
+          ctx.beginPath();
+          ctx.arc(0, -size * 0.6, size * 0.25, 0, Math.PI * 2);
+          ctx.fill();
+          // 방탄조끼
+          ctx.fillStyle = '#7f8c8d';
+          ctx.fillRect(-size * 0.25, -size * 0.35, size * 0.5, size * 0.55);
+          // HP 바
+          ctx.fillStyle = '#e74c3c';
+          ctx.fillRect(-size * 0.3, -size * 0.9, size * 0.6, 5);
+          ctx.restore();
+        }
+      });
+
+      // 4. 총알 궤적
+      bullets.forEach(b => {
+        const curX = b.x + (b.targetX - b.x) * b.progress;
+        const curY = b.y + (b.targetY - b.y) * b.progress;
+        ctx.strokeStyle = '#f1c40f';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(curX, curY);
+        ctx.lineTo(curX + (b.targetX - b.x) * 0.15, curY + (b.targetY - b.y) * 0.15);
+        ctx.stroke();
+      });
+
+      // 5. 파티클 이펙트
+      particles.forEach(pt => {
+        ctx.fillStyle = pt.color;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // 6. 플레이어 뒷모습 렌더링 (첨부 이미지의 3인칭 배그 3레벨 헬멧 & 방탄 조끼)
+      const pScreenX = canvas.width / 2;
+      const pScreenY = canvas.height * 0.82 + player.recoil;
+
+      ctx.save();
+      ctx.translate(pScreenX, pScreenY);
+
+      // 머리 / 3렙 헬멧 (블랙 헬멧 + 바이저 틈)
+      ctx.fillStyle = '#1e272e';
+      ctx.beginPath();
+      ctx.ellipse(0, -player.height, 20, 24, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // 헬멧 후면 띠
+      ctx.strokeStyle = '#485460';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // 전술 방탄 조끼 (전술 몰리 파우치 패턴)
+      ctx.fillStyle = '#535c68';
+      ctx.beginPath();
+      ctx.roundRect(-26, -player.height + 22, 52, 45, 6);
+      ctx.fill();
+
+      // 조끼 몰리 웨빙 줄무늬
+      ctx.strokeStyle = '#353b48';
+      ctx.lineWidth = 2.5;
+      for (let yOffset = -player.height + 28; yOffset < -player.height + 60; yOffset += 8) {
+        ctx.beginPath();
+        ctx.moveTo(-22, yOffset);
+        ctx.lineTo(22, yOffset);
+        ctx.stroke();
+      }
+
+      // 하의 (바지)
+      ctx.fillStyle = '#95afc0';
+      ctx.fillRect(-22, -player.height + 67, 18, 30);
+      ctx.fillRect(4, -player.height + 67, 18, 30);
+
+      // 라이플 총기 개머리판 및 팔
+      ctx.fillStyle = '#2f3542';
+      ctx.fillRect(16, -player.height + 30, 16, 10);
+
+      ctx.restore();
+    }
+
+    /* ==========================================================
+       4. 게임 루프 & 로직
+       ========================================================== */
+    let lastEnemySpawn = 0;
+
+    function gameLoop(timestamp) {
+      if (gameState === 'PLAYING') {
+        // 플레이어 좌우 이동
+        if (keys['KeyA'] || keys['ArrowLeft']) player.x = Math.max(-350, player.x - player.speed);
+        if (keys['KeyD'] || keys['ArrowRight']) player.x = Math.min(350, player.x + player.speed);
+
+        // 반동 복귀
+        player.recoil *= 0.85;
+
+        // 적 스폰
+        if (timestamp - lastEnemySpawn > 1400) {
+          enemies.push(new Enemy());
+          lastEnemySpawn = timestamp;
+        }
+
+        // 적 이동 및 피격 판정
+        for (let i = enemies.length - 1; i >= 0; i--) {
+          const e = enemies[i];
+          e.update();
+
+          // 플레이어 근처 도달 시 데미지
+          if (e.z <= 60) {
+            enemies.splice(i, 1);
+            takeDamage(20);
+          }
+        }
+
+        // 총알 이동
+        for (let i = bullets.length - 1; i >= 0; i--) {
+          const b = bullets[i];
+          b.update();
+          if (b.progress >= 1) {
+            bullets.splice(i, 1);
+          }
+        }
+
+        // 파티클 업데이트
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const pt = particles[i];
+          pt.x += pt.vx;
+          pt.y += pt.vy;
+          pt.size *= 0.92;
+          pt.life--;
+          if (pt.life <= 0) particles.splice(i, 1);
+        }
+      }
+
+      renderScene();
+      requestAnimationFrame(gameLoop);
+    }
+
+    /* ==========================================================
+       5. 사격 및 타격 판정 (Raycast 2D/3D)
+       ========================================================== */
+    window.addEventListener('mousedown', e => {
+      if (gameState !== 'PLAYING') return;
+
+      const rect = canvas.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+
+      // 발사 반동
+      player.recoil = 8;
+
+      // 총알 발사체 생성 (플레이어 총구 -> 클릭 지점)
+      const muzzleX = canvas.width / 2 + 25;
+      const muzzleY = canvas.height * 0.82;
+      bullets.push(new Bullet(muzzleX, muzzleY, clickX, clickY));
+
+      // 총구 화염 이펙트 파티클
+      for (let i = 0; i < 6; i++) {
+        particles.push({
+          x: muzzleX,
+          y: muzzleY,
+          vx: (Math.random() - 0.5) * 5,
+          vy: (Math.random() - 0.5) * 5,
+          size: 6 + Math.random() * 4,
+          color: '#f39c12',
+          life: 8
+        });
+      }
+
+      // 적 타격 검사
+      let hit = false;
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        const enemy = enemies[i];
+        const proj = project3D(enemy.x, 30, enemy.z);
+        const radius = Math.max(20, 60 * proj.scale);
+
+        const dist = Math.hypot(clickX - proj.x, clickY - proj.y);
+        if (dist < radius) {
+          // 적 처치 성공!
+          hit = true;
+          createHitParticles(proj.x, proj.y);
+          enemies.splice(i, 1);
+
+          kills++;
+          score += 100;
+          killsUntilNextQuiz--;
+
+          updateHUD();
+
+          // 퀴즈 등장 조건 충족
+          if (killsUntilNextQuiz <= 0) {
+            triggerQuizAirdrop();
+          }
+          break;
+        }
+      }
+    });
+
+    function createHitParticles(x, y) {
+      for (let i = 0; i < 15; i++) {
+        particles.push({
+          x: x,
+          y: y,
+          vx: (Math.random() - 0.5) * 10,
+          vy: (Math.random() - 0.5) * 10,
+          size: 4 + Math.random() * 4,
+          color: Math.random() > 0.5 ? '#e74c3c' : '#f1c40f',
+          life: 20
+        });
+      }
+    }
+
+    function takeDamage(dmg) {
+      hp = Math.max(0, hp - dmg);
+      const flash = document.getElementById('damageFlash');
+      flash.style.opacity = '1';
+      setTimeout(() => flash.style.opacity = '0', 150);
+
+      updateHUD();
+      if (hp <= 0) {
+        gameOver();
+      }
+    }
+
+    function updateHUD() {
+      document.getElementById('killCount').innerText = kills;
+      document.getElementById('scoreCount').innerText = score;
+      document.getElementById('nextQuizRemaining').innerText = killsUntilNextQuiz;
+      document.getElementById('hpBar').style.width = (hp / MAX_HP * 100) + '%';
+    }
+
+    /* ==========================================================
+       6. 퀴즈 에어드랍 시스템
+       ========================================================== */
+    function triggerQuizAirdrop() {
+      gameState = 'QUIZ';
+      const modal = document.getElementById('quizModal');
+      const randomQ = quizBank[Math.floor(Math.random() * quizBank.length)];
+
+      document.getElementById('quizQuestionText').innerText = randomQ.q;
+      const snippetContainer = document.getElementById('blockSnippetContainer');
+      if (randomQ.codeSnippet) {
+        snippetContainer.innerHTML = randomQ.codeSnippet;
+        snippetContainer.style.display = 'block';
+      } else {
+        snippetContainer.style.display = 'none';
+      }
+
+      const optionsBox = document.getElementById('quizOptionsContainer');
+      optionsBox.innerHTML = '';
+
+      randomQ.options.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'option-btn';
+        btn.innerText = `${idx + 1}. ${opt}`;
+        btn.onclick = () => handleQuizAnswer(idx + 1 === randomQ.ans);
+        optionsBox.appendChild(btn);
+      });
+
+      modal.style.display = 'flex';
+    }
+
+    function handleQuizAnswer(isCorrect) {
+      const modal = document.getElementById('quizModal');
+      modal.style.display = 'none';
+
+      if (isCorrect) {
+        alert('🎉 정답입니다! 전술 보급을 획득했습니다 (+300점, 체력 회복)');
+        score += 300;
+        hp = Math.min(MAX_HP, hp + 35);
+      } else {
+        alert('❌ 오답입니다! 적의 공습을 받았습니다 (-25 HP)');
+        takeDamage(25);
+      }
+
+      // 퀴즈 간격 초기화 후 게임 재개
+      killsUntilNextQuiz = QUIZ_KILL_INTERVAL;
+      updateHUD();
+      if (hp > 0) gameState = 'PLAYING';
+    }
+
+    /* ==========================================================
+       7. 게임 시작 및 게임 오버 (랭킹 등록)
+       ========================================================== */
+    function startGame() {
+      const studentId = document.getElementById('inputStudentId').value.trim();
+      const studentName = document.getElementById('inputStudentName').value.trim();
+
+      if (!studentId || !studentName) {
+        alert('학번과 이름을 모두 입력해주세요!');
+        return;
+      }
+
+      currentStudent = { id: studentId, name: studentName };
+      document.getElementById('hudStudentDisplay').innerText = `${studentId} ${studentName}`;
+
+      document.getElementById('startScreen').style.display = 'none';
+      document.getElementById('hud').style.display = 'block';
+
+      // 변수 초기화
+      score = 0;
+      kills = 0;
+      hp = MAX_HP;
+      killsUntilNextQuiz = QUIZ_KILL_INTERVAL;
+      enemies = [];
+      bullets = [];
+      updateHUD();
+
+      gameState = 'PLAYING';
+    }
+
+    function gameOver() {
+      gameState = 'GAMEOVER';
+      document.getElementById('hud').style.display = 'none';
+      const gameOverModal = document.getElementById('gameOverModal');
+      document.getElementById('gameOverSummary').innerText = 
+        `${currentStudent.id} ${currentStudent.name} 학생 최종 점수: ${score}점 (격추: ${kills}마리)`;
+
+      // 랭킹 저장 및 정렬
+      saveLeaderboard(currentStudent.id, currentStudent.name, kills, score);
+      renderLeaderboard();
+
+      gameOverModal.style.display = 'flex';
+    }
+
+    function restartGame() {
+      document.getElementById('gameOverModal').style.display = 'none';
+      document.getElementById('startScreen').style.display = 'flex';
+    }
+
+    function saveLeaderboard(id, name, k, s) {
+      let ranks = JSON.parse(localStorage.getItem('bonoh_leaderboard')) || [];
+      ranks.push({ id, name, kills: k, score: s, date: new Date().toLocaleDateString() });
+      ranks.sort((a, b) => b.score - a.score);
+      ranks = ranks.slice(0, 10); // 상위 10명만 저장
+      localStorage.setItem('bonoh_leaderboard', JSON.stringify(ranks));
+    }
+
+    function renderLeaderboard() {
+      const tbody = document.getElementById('rankTableBody');
+      tbody.innerHTML = '';
+      const ranks = JSON.parse(localStorage.getItem('bonoh_leaderboard')) || [];
+
+      ranks.forEach((r, idx) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}</td>
+          <td>${r.id}</td>
+          <td>${r.name}</td>
+          <td>${r.kills}</td>
+          <td style="color:#f1c40f; font-weight:bold;">${r.score}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    /* ==========================================================
+       8. 선생님 모드 (비밀번호 인증: 8666 & 문제 관리)
+       ========================================================== */
+    function openTeacherAuth() {
+      const pw = prompt('선생님 비밀번호 4자리를 입력하세요:');
+      if (pw === '8666') {
+        openAdminModal();
+      } else if (pw !== null) {
+        alert('비밀번호가 올바르지 않습니다.');
+      }
+    }
+
+    function openAdminModal() {
+      document.getElementById('adminModal').style.display = 'flex';
+      renderAdminList();
+    }
+
+    function closeAdminModal() {
+      document.getElementById('adminModal').style.display = 'none';
+    }
+
+    function renderAdminList() {
+      const list = document.getElementById('adminQuestionsList');
+      const badge = document.getElementById('qCountBadge');
+      list.innerHTML = '';
+      badge.innerText = quizBank.length;
+
+      quizBank.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'q-item';
+        div.innerHTML = `
+          <div style="flex:1; padding-right:10px;">
+            <b>Q${index + 1}. ${item.q}</b><br>
+            <span style="color:#888;">보기: ${item.options.join(', ')} | 정답: ${item.ans}번</span>
+          </div>
+          <button class="delete-btn" onclick="deleteQuestion(${index})">삭제</button>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function addNewQuestion() {
+      const text = document.getElementById('newQText').value.trim();
+      const opts = document.getElementById('newQOptions').value.trim();
+      const ans = parseInt(document.getElementById('newQAnswer').value);
+
+      if (!text || !opts || isNaN(ans)) {
+        alert('모든 입력 칸을 올바르게 채워주세요!');
+        return;
+      }
+
+      const optionsArr = opts.split(',').map(s => s.trim());
+      if (ans < 1 || ans > optionsArr.length) {
+        alert(`정답 번호는 1 ~ ${optionsArr.length} 사이여야 합니다.`);
+        return;
+      }
+
+      quizBank.push({
+        q: text,
+        options: optionsArr,
+        ans: ans,
+        codeSnippet: null
+      });
+
+      saveQuizBank();
+      renderAdminList();
+
+      document.getElementById('newQText').value = '';
+      document.getElementById('newQOptions').value = '';
+      document.getElementById('newQAnswer').value = '';
+      alert('새로운 문제가 성공적으로 등록되었습니다!');
+    }
+
+    function deleteQuestion(index) {
+      if (confirm('이 문제를 삭제하시겠습니까?')) {
+        quizBank.splice(index, 1);
+        saveQuizBank();
+        renderAdminList();
+      }
+    }
+
+    // 엔진 가동
+    requestAnimationFrame(gameLoop);
+  </script>
+</body>
+</html>
